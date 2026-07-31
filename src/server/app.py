@@ -3,8 +3,10 @@ FastAPI Redfish REST API implementation for Liquid Cooling Loop Telemetry Engine
 """
 
 from fastapi import FastAPI, Response, HTTPException
+from pydantic import BaseModel
 from src.redfish.models import ServiceRoot, CoolingLoopResource, SensorReading
 from src.engine.simulator import CoolingLoopSimulator
+
 
 app = FastAPI(
     title="Redfish Liquid Cooling Telemetry Engine Mock",
@@ -198,4 +200,41 @@ async def get_event_service_sse():
             await asyncio.sleep(1.0)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+class HeatLoadRequest(BaseModel):
+    watts: float
+
+
+class PumpRPMRequest(BaseModel):
+    rpm: float
+
+
+class FaultRequest(BaseModel):
+    fault_type: str
+
+
+@app.post("/api/v1/simulation/heat_load")
+def set_simulation_heat_load(req: HeatLoadRequest):
+    simulator.set_heat_load(req.watts)
+    return {"status": "success", "heat_load_watts": simulator.heat_load}
+
+
+@app.post("/api/v1/simulation/pump_rpm")
+def set_simulation_pump_rpm(req: PumpRPMRequest):
+    simulator.set_pump_rpm(req.rpm)
+    return {"status": "success", "pump_rpm": simulator.pump_rpm, "flow_rate_lpm": simulator.flow_rate}
+
+
+@app.post("/api/v1/simulation/fault")
+def inject_simulation_fault(req: FaultRequest):
+    simulator.inject_fault(req.fault_type)
+    return {"status": "success", "active_fault": simulator.active_fault, "health_status": simulator.health_status}
+
+
+@app.post("/api/v1/simulation/reset")
+def reset_simulation():
+    simulator.clear_fault()
+    return {"status": "success", "active_fault": None, "health_status": "OK"}
+
 

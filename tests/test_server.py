@@ -69,7 +69,29 @@ class TestRedfishServerAPI(unittest.TestCase):
         self.assertEqual(data["Id"], "CoolingLoopMetrics")
         self.assertEqual(len(data["MetricValues"]), 5)
 
+    def test_simulation_control_endpoints(self):
+        # Set heat load
+        res_heat = self.client.post("/api/v1/simulation/heat_load", json={"watts": 18000})
+        self.assertEqual(res_heat.status_code, 200)
+        self.assertEqual(res_heat.json()["heat_load_watts"], 18000)
+
+        # Set pump RPM
+        res_pump = self.client.post("/api/v1/simulation/pump_rpm", json={"rpm": 2400})
+        self.assertEqual(res_pump.status_code, 200)
+        self.assertEqual(res_pump.json()["pump_rpm"], 2400)
+
+        # Inject fault
+        res_fault = self.client.post("/api/v1/simulation/fault", json={"fault_type": "leak"})
+        self.assertEqual(res_fault.status_code, 200)
+        self.assertEqual(res_fault.json()["health_status"], "Warning")
+
+        # Reset
+        res_reset = self.client.post("/api/v1/simulation/reset")
+        self.assertEqual(res_reset.status_code, 200)
+        self.assertEqual(res_reset.json()["health_status"], "OK")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
