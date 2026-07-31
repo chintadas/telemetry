@@ -136,3 +136,66 @@ def get_sensor(sensor_id: str):
             "Status": {"State": "Enabled", "Health": state["health_status"]},
         }
     )
+
+
+@app.get("/redfish/v1/EventService")
+def get_event_service():
+    return {
+        "@odata.id": "/redfish/v1/EventService",
+        "@odata.type": "#EventService.v1_8_0.EventService",
+        "Id": "EventService",
+        "Name": "Redfish Event Service",
+        "Status": {"State": "Enabled", "Health": "OK"},
+        "SSEFilterPropertiesSupported": {"MetricReport": True, "Event": True},
+        "ServerSentEventUri": "/redfish/v1/EventService/SSE",
+    }
+
+
+@app.get("/redfish/v1/TelemetryService/MetricReports/CoolingLoopMetrics")
+def get_cooling_loop_metric_report():
+    state = simulator.tick()
+    return {
+        "@odata.id": "/redfish/v1/TelemetryService/MetricReports/CoolingLoopMetrics",
+        "@odata.type": "#MetricReport.v1_4_2.MetricReport",
+        "Id": "CoolingLoopMetrics",
+        "Name": "Cooling Loop Realtime Metric Report",
+        "MetricValues": [
+            {"MetricId": "SupplyTemp", "MetricValue": str(state["supply_temperature_celsius"])},
+            {"MetricId": "ReturnTemp", "MetricValue": str(state["return_temperature_celsius"])},
+            {"MetricId": "FlowRate", "MetricValue": str(state["flow_rate_lpm"])},
+            {"MetricId": "Pressure", "MetricValue": str(state["pressure_kpa"])},
+            {"MetricId": "PumpRPM", "MetricValue": str(state["pump_rpm"])},
+        ],
+    }
+
+
+import json
+import asyncio
+from fastapi.responses import StreamingResponse
+
+
+@app.get("/redfish/v1/EventService/SSE")
+async def get_event_service_sse():
+    """Server-Sent Events endpoint streaming Redfish telemetry events live."""
+
+    async def event_generator():
+        while True:
+            state = simulator.tick()
+            event_data = {
+                "@odata.type": "#Event.v1_7_0.Event",
+                "Id": "LiquidCoolingTelemetryEvent",
+                "Events": [
+                    {
+                        "EventId": "TelemetryUpdate",
+                        "EventType": "MetricReport",
+                        "OriginOfCondition": {"@odata.id": "/redfish/v1/Chassis/1/ThermalSubsystem/CoolingLoops/1"},
+                        "Message": f"Supply: {state['supply_temperature_celsius']}C, Return: {state['return_temperature_celsius']}C, Flow: {state['flow_rate_lpm']}LPM",
+                        "Severity": "OK" if state["health_status"] == "OK" else "Critical",
+                    }
+                ],
+            }
+            yield f"data: {json.dumps(event_data)}\n\n"
+            await asyncio.sleep(1.0)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+

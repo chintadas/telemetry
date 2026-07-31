@@ -55,6 +55,21 @@ class TestRedfishServerAPI(unittest.TestCase):
         response = self.client.get("/redfish/v1/Chassis/1/Sensors/InvalidSensorID")
         self.assertEqual(response.status_code, 404)
 
+    def test_event_service_endpoint(self):
+        response = self.client.get("/redfish/v1/EventService")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["Id"], "EventService")
+        self.assertEqual(data["ServerSentEventUri"], "/redfish/v1/EventService/SSE")
+
+    def test_metric_report_endpoint(self):
+        response = self.client.get("/redfish/v1/TelemetryService/MetricReports/CoolingLoopMetrics")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["Id"], "CoolingLoopMetrics")
+        self.assertEqual(len(data["MetricValues"]), 5)
+
 
 if __name__ == "__main__":
     unittest.main()
+
